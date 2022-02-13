@@ -1,0 +1,135 @@
+---
+title: "mtcars Regression Analysis"
+author: "Saurabh Ghadge"
+date: "05/02/2022"
+output: html_document
+---
+### Objective of study are:  
+* “Is an automatic or manual transmission better for MPG”
+
+* "Quantify the MPG difference between automatic and manual transmissions"   
+Attaching require packages:  
+
+```{r}
+data(mtcars)
+library(tidyverse)
+```
+Let us look at the some quick summary data-  
+```{r}
+head(mtcars)
+str(mtcars)
+```
+#### EDA  
+first we plot pair plot:  
+```{r}
+pairs(mtcars)
+```
+```{r}
+g <- ggplot(data = mtcars, mapping = aes(x = mpg,y = am))
+g + geom_point()
+```
+  
+  Plot gives us idea about manual transmission are tends to give more mileage.  
+```{r}
+g <- ggplot(data = mtcars, mapping = aes(x = mpg,y = disp))
+g + geom_point()+facet_grid(am~.)+geom_smooth()
+```
+  
+  Plot shows that Miles/(US) gallon is negatively correlated Displacement (cu.in.) which is seen deeply negatively correlated with cars having manual transmission (1).  
+```{r}
+g <- ggplot(data = mtcars, mapping = aes(x = mpg,y = wt))
+g + geom_point()
+```
+  
+  Above plot shows that weight and mpg are strongly negatively correlated.  
+  
+  here,R is treating some of the column as numeric instead of that they should be treated as factor, And then we will find correlation of mpg with other continuous variable.  
+```{r}
+mtcars <- tibble(mtcars)
+mtcars$vs <- as.factor(mtcars$vs)
+mtcars$am <- as.factor(mtcars$am)
+mtcars$gear <- as.factor(mtcars$gear)
+mtcars$carb <- as.factor(mtcars$carb)
+mtcars$cyl <- as.factor(mtcars$cyl)
+head(mtcars)
+```
+```{r}
+cont_mtcars <- mtcars %>% select(mpg,disp,hp,drat,wt,qsec)
+cor(cont_mtcars)
+```
+  
+  Here, we see that mpg and qsec are moderately correlated so we are including in our study.  
+Now we will fit the model(multiple linear regression) model with all other continuous variable and with including only one categorical variable *am*(Transmission (0 = automatic, 1 = manual)).  
+```{r}
+new_mtcars <- mtcars %>% select(mpg,disp,hp,drat,wt,qsec,am)
+fit1 <- lm(mpg~.,data = new_mtcars)
+summary(fit1)
+```
+  
+  When transmission of car is automatic (am = 0),we can interpret intercept as expected Miles/(US) gallon when all other regressors are held constant or all regressor haves value equal to zero for automatic transmission(beta_0),and when transmission of car is manual the intercept becomes Intercept + am1 = 10.71 + 2.98 = 13.69 which is expected Miles/(US) gallon for manual transmission car when all other regressors are held constant or all regressor haves value equal to zero.  
+  Also from summary of fitted model we see that p value for variable *disp*, *hp*, *drat* is not significant, i.e. it is try to say that slope of that variable is nearly close to zero, So excluding those variable from model will not affect the model that much.  
+  p_value for *qsec*, *wt* is highly significant suggesting that they are playing important role in this model.  
+  The Value of *R square* is 0.8867, which tells that about 87% variability in target variable/output data is explained by our model.  
+  
+Following are residual diagnostic plot:  
+```{r}
+plot(fit1)
+```
+From Residual Vs Fitted plot we see that, as time goes, spread of data is somewhat seems to be increasing.. which tells that residuals are increasing function of target, i.e assumption of constant variance is violated here.Which can be made stabilized using log transformation on output/target variable before fitting.  
+Quantile plot of residuals is showing our residuals are normally distributed.Plot can we made more interpretative as residuals are following Gaussian(Normal) distribution if we use log transformation to target at starting of model building.  
+Residual Vs leverage plot shows that there are no outlier in our data.  
+
+Leaverage and Outlier :  
+```{r}
+hatvalues(fit1)
+```
+  
+  Only observation at 31 time point haves a high value for Hat.
+Lets try to fit a model without a including Transmission of car,and copare with previous model.
+```{r}
+new_mtcars <- mtcars %>% select(mpg,disp,hp,drat,wt,qsec)
+fit2 <- lm(mpg~.,data = new_mtcars)
+summary(fit2)
+```
+  
+  The value of both *R_square* and *adj R_sqaure* decreases in this model if we compared them with previous model, which indicate that Transmission plays significant role in estimating Miles/(US) gallon of car.  
+  For more validation Let us compare both model by AIC..  
+```{r}
+AIC(fit1,fit2)
+```
+  
+  Criteria is that we use model with higher AIC, here AIC for model 2 high,which shows Transmission adds significant linear prediction beyond the other variable.  
+  
+  As in both model we observe that variable disp, hp, drat, are not playing that much of significant role in model. So next we are going to fit the model by dropping them. And also we use log transformation to target variable to make variability of target constant over time.  
+  
+  
+```{r}
+cars <- mtcars %>% select(mpg,wt,qsec,am)
+fit3 <- lm(log(mpg)~.,data = cars)
+summary(fit3)
+```
+  
+  All regression coefficients have their respective meaning as explained earlier in this case we have to exp(coef) as we use a log transformation at start of model.
+  We see that now all variables are playing significant role in model building, which can seen by their respective p_values.Also this model is explaining about 88% variability from the output variable.  
+To verify validity we can see residual diagnosis which in case are looking satisfying all criteria i.e. constant variance of residual,normality of residual.  
+
+For choosing best model with best set of parameters we can use stepwise selection statistical procedure to do so..   
+* Best Subset Regression
+Select the subset of predictors that do the best at meeting some well-defined objective criterion, such as having
+the largest R2 value or the smallest MSE, Mallow's Cp or AIC.
+```{r}
+library(olsrr)
+best_fit <- ols_step_best_subset(lm(mpg~.,data = mtcars))
+best_fit
+```
+
+  
+   which shows that model 4 having regressor  cyl hp wt am  is doing well.  
+  
+  
+#### summary :-   
+* Model with Regressor cyl,hp,wt,am are best set of regressor as it generates better adjusted R_square and also other evaluation metrics values as compared other subsets of regressor involving in model.  
+
+#### Conclussions :-  
+* From above we see that including Transmission is play significant role.  
+* Manual transmission tends to give a better mileage as compared to automatic transmission.
